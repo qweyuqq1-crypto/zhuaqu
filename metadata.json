@@ -1,0 +1,5 @@
+{
+  "name": "NodeScout CF",
+  "description": "一个用于收集、管理和分析代理节点的仪表盘。具有 AI 智能解析、延迟可视化和 Cloudflare Worker 配置生成功能。",
+  "requestFramePermissions": []
+}
