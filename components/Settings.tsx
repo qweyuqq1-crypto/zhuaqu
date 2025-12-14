@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { AppSettings } from '../types';
-import { Save, Mail, Clock, Key, Server, Plus, Trash2, Code, Copy, CheckCircle2, AlertCircle, Play, Globe, Bell, Send } from 'lucide-react';
+import { Save, Mail, Clock, Key, Server, Plus, Trash2, Code, Copy, CheckCircle2, AlertCircle, Play, Globe, Bell, Send, HelpCircle, ExternalLink } from 'lucide-react';
 
 export const Settings: React.FC = () => {
   const [settings, setSettings] = useState<AppSettings>({
@@ -8,7 +8,6 @@ export const Settings: React.FC = () => {
     emailProvider: 'telegram',
     apiKey: '',
     cronSchedule: '0 8 * * *',
-    // Pre-filled with popular public GitHub repositories
     sources: [
         'https://raw.githubusercontent.com/freefq/free/master/v2',
         'https://raw.githubusercontent.com/aiboboxx/v2rayfree/main/v2',
@@ -26,9 +25,7 @@ export const Settings: React.FC = () => {
   useEffect(() => {
     const saved = localStorage.getItem('nodescout_settings');
     if (saved) {
-      // Merge saved settings with defaults to ensure structure validity
       const parsed = JSON.parse(saved);
-      // If user has no sources saved, fallback to the new defaults
       if (!parsed.sources || parsed.sources.length === 0) {
           parsed.sources = settings.sources;
       }
@@ -42,8 +39,8 @@ export const Settings: React.FC = () => {
 
   const handleSave = () => {
     localStorage.setItem('nodescout_settings', JSON.stringify(settings));
-    setNotification('配置已保存至本地！');
-    setTimeout(() => setNotification(''), 3000);
+    setNotification('配置已保存至本地！请重新复制脚本并部署。');
+    setTimeout(() => setNotification(''), 4000);
   };
 
   const addSource = () => {
@@ -86,13 +83,16 @@ export const Settings: React.FC = () => {
     // Escape the API key properly for JS string
     const safeApiKey = settings.apiKey.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
     const safeSources = JSON.stringify(settings.sources, null, 2);
+    // Remove trailing slash if present
+    const cleanWorkerUrl = settings.workerUrl ? settings.workerUrl.replace(/\/$/, "") : "";
 
     const script = `/**
- * NodeScout CF - Enterprise Edition Worker (Optimized V3)
+ * NodeScout CF - Enterprise Edition Worker (v4 Subscription Mode)
  * -----------------------------------------
- * 功能：全自动节点搜集、Base64智能解析、去重、订阅生成、每日推送
- * 特性：支持 CORS、支持 Deep Decode、支持 Telegram 分片推送
- * 构建时间: ${new Date().toISOString()}
+ * 更新日志：
+ * - 移除了直接推送 Base64 乱码的功能
+ * - 改为推送“订阅链接”，点击即可更新节点
+ * - 优化了 Telegram 消息排版
  */
 
 const CONFIG = {
@@ -102,6 +102,7 @@ const CONFIG = {
   MAILGUN_DOMAIN: "mg.yourdomain.com", 
   SOURCES: ${safeSources},
   MAX_NODES: 1000,
+  WORKER_URL: "${cleanWorkerUrl}", // 你的 Worker 地址
   USER_AGENT: "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36 v2rayN/6.33",
 };
 
@@ -126,14 +127,15 @@ export default {
       return new Response(result, { headers: { ...corsHeaders, 'content-type': 'text/plain; charset=utf-8'} });
     }
 
-    // 获取订阅链接
+    // 获取订阅链接 (核心功能)
     if (url.pathname === "/sub") {
        const { base64 } = await fetchAndParseNodes();
+       // 返回 text/plain 以便 v2rayN/Clash 识别
        return new Response(base64, { headers: { ...corsHeaders, 'content-type': 'text/plain'} });
     }
 
     return new Response(
-      "NodeScout Worker Active.\\n\\nEndpoints:\\n  /sub  (获取订阅)\\n  /test (手动执行抓取)", 
+      "NodeScout Worker is Running.\\n\\nSubscription URL: " + url.origin + "/sub", 
       { headers: { ...corsHeaders, 'content-type': 'text/plain'} }
     );
   }
@@ -149,11 +151,11 @@ async function handleAutoTask(env) {
   const { nodes, base64 } = await fetchAndParseNodes(log);
   log(\`Process: Extracted \${nodes.length} unique valid nodes.\`);
 
-  // 2. 推送
+  // 2. 推送 (仅推送状态和订阅链接，不推送 Base64 内容)
   if (nodes.length > 0 && CONFIG.RECIPIENT && CONFIG.API_KEY) {
     try {
       log(\`Push: Sending via \${CONFIG.PROVIDER}...\`);
-      await sendNotification(nodes.length, base64, CONFIG.RECIPIENT, log);
+      await sendNotification(nodes.length, CONFIG.RECIPIENT, log);
       log("Success: Notification sent.");
     } catch (e) {
       log(\`Error: Push failed - \${e.message}\`);
@@ -187,7 +189,6 @@ async function fetchAndParseNodes(log = () => {}) {
   const results = await Promise.all(promises);
   allRawData = results.join("\\n");
 
-  // 正则提取所有协议链接
   const protocols = ['vmess', 'vless', 'ss', 'ssr', 'trojan'];
   let candidates = [];
   
@@ -196,7 +197,7 @@ async function fetchAndParseNodes(log = () => {}) {
     candidates = [...candidates, ...(allRawData.match(regex) || [])];
   });
 
-  // 去重逻辑
+  // 去重
   const uniqueSet = new Set(candidates);
   const uniqueLinks = Array.from(uniqueSet).slice(0, CONFIG.MAX_NODES);
   
@@ -206,7 +207,6 @@ async function fetchAndParseNodes(log = () => {}) {
   return { nodes: uniqueLinks, base64 };
 }
 
-// 递归解码 Base64 (最大深度3层)
 function recursiveDecode(text, depth = 0) {
     if (depth > 3) return text;
     const clean = text.replace(/\\s/g, '');
@@ -214,7 +214,6 @@ function recursiveDecode(text, depth = 0) {
         try {
             const normalized = clean.replace(/-/g, '+').replace(/_/g, '/');
             const decoded = atob(normalized);
-            // 如果解码后还是 Base64，继续解
             if (decoded.length > 20 && !decoded.includes('://') && /^[A-Za-z0-9+/=]+$/.test(decoded.replace(/\\s/g,''))) {
                 return recursiveDecode(decoded, depth + 1);
             }
@@ -224,32 +223,40 @@ function recursiveDecode(text, depth = 0) {
     return text;
 }
 
-async function sendNotification(count, base64Content, recipient, log) {
+// 核心修改：只发送订阅链接
+async function sendNotification(count, recipient, log) {
     const today = new Date().toLocaleDateString();
+    // 自动构建订阅链接
+    const subUrl = CONFIG.WORKER_URL ? (CONFIG.WORKER_URL + "/sub") : "⚠️ 请先在配置页面填写 Worker URL";
     
     if (CONFIG.PROVIDER === 'telegram') {
         const url = \`https://api.telegram.org/bot\${CONFIG.API_KEY}/sendMessage\`;
         
-        // 1. 发送统计信息
-        const summaryText = \`🌍 *NodeScout 每日播报*\\\\n\\\\n📅 日期: \${today}\\\\n📊 节点数: \${count} 个\\\\n\\\\n⏬ *订阅内容如下:*\`;
+        const message = \`
+🌍 *NodeScout 每日播报*
+-------------------------
+📅 日期: \${today}
+📊 节点: \${count} 个
+-------------------------
+🔗 *订阅链接 (点击复制):*
+\` + "\`" + subUrl + "\`" + \`
+
+💡 *使用说明:*
+1. 复制上方链接。
+2. 粘贴到 v2rayN / Clash / Shadowrocket。
+3. 更新订阅即可获取最新节点。
+\`;
+
         await fetch(url, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ chat_id: recipient, text: summaryText, parse_mode: 'Markdown' })
+            body: JSON.stringify({ 
+                chat_id: recipient, 
+                text: message, 
+                parse_mode: 'Markdown',
+                disable_web_page_preview: true
+            })
         });
-        
-        // 2. 发送订阅内容 (分片，每片3000字符)
-        const CHUNK_SIZE = 3000;
-        for (let i = 0; i < base64Content.length; i += CHUNK_SIZE) {
-            const chunk = base64Content.substring(i, i + CHUNK_SIZE);
-            await fetch(url, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ chat_id: recipient, text: chunk })
-            });
-            // 简单延时避免触发速率限制
-            await new Promise(r => setTimeout(r, 200)); 
-        }
     }
     
     else if (CONFIG.PROVIDER === 'mailgun') {
@@ -257,8 +264,18 @@ async function sendNotification(count, base64Content, recipient, log) {
         const formData = new FormData();
         formData.append('from', \`NodeScout <postmaster@\${CONFIG.MAILGUN_DOMAIN}>\`);
         formData.append('to', recipient);
-        formData.append('subject', \`NodeScout 每日订阅 - \${today}\`);
-        formData.append('text', \`成功采集 \${count} 个节点。\\n\\nBase64 订阅内容:\\n\${base64Content}\`);
+        formData.append('subject', \`NodeScout 每日订阅更新 - \${count}个节点\`);
+        formData.append('text', \`
+NodeScout 采集完成。
+
+日期: \${today}
+节点数量: \${count}
+
+订阅链接:
+\${subUrl}
+
+请将此链接添加到您的代理软件中。
+\`);
 
         const auth = btoa(\`api:\${CONFIG.API_KEY}\`);
         await fetch(url, {
@@ -320,7 +337,7 @@ async function sendNotification(count, base64Content, recipient, log) {
                 </div>
             </div>
 
-            {/* 2. Push Notification Config - NEW SECTION */}
+            {/* 2. Push Notification Config */}
             <div className="bg-gray-900 border border-gray-800 rounded-xl p-6 space-y-4 shadow-lg">
                 <div className="flex items-center gap-2 border-b border-gray-800 pb-3 text-blue-400">
                     <Bell size={20} />
@@ -398,25 +415,49 @@ async function sendNotification(count, base64Content, recipient, log) {
                     <h3 className="font-semibold text-gray-200">3. 远程部署与验证</h3>
                 </div>
                 
+                <div className="bg-purple-900/20 rounded-lg p-3 border border-purple-500/20 mb-4">
+                    <div className="flex items-start gap-2">
+                        <HelpCircle size={14} className="text-purple-400 mt-0.5 shrink-0" />
+                        <div className="text-xs text-gray-400 space-y-1">
+                            <p className="font-semibold text-purple-300">必填：Worker URL (用于生成订阅链接)</p>
+                            <ol className="list-decimal pl-4 space-y-0.5">
+                                <li>在 Cloudflare 创建 Worker，先部署一次默认代码。</li>
+                                <li>复制 Worker 详情页的 URL (如 xxx.workers.dev) 到下方输入框。</li>
+                                <li><strong>保存配置</strong>，然后复制右侧生成的新代码覆盖 Cloudflare 里的代码。</li>
+                            </ol>
+                        </div>
+                    </div>
+                </div>
+
                 <div>
-                    <label className="block text-xs font-medium text-gray-500 mb-1">部署后的 Worker URL</label>
+                    <label className="block text-xs font-medium text-gray-500 mb-1">Worker URL (订阅/后端地址)</label>
                     <input 
                         type="text" 
                         value={settings.workerUrl}
                         onChange={e => setSettings({...settings, workerUrl: e.target.value})}
-                        className="w-full bg-gray-950 border border-gray-800 rounded-lg px-3 py-2 text-white text-sm focus:border-purple-500 focus:outline-none placeholder-gray-700"
-                        placeholder="https://your-worker.subdomain.workers.dev"
+                        className="w-full bg-gray-950 border border-gray-800 rounded-lg px-3 py-2 text-white text-sm focus:border-purple-500 focus:outline-none placeholder-gray-700 font-mono"
+                        placeholder="https://nodescout-backend.yourname.workers.dev"
                     />
                 </div>
 
-                <button 
-                    onClick={handleRemoteTest}
-                    disabled={!settings.workerUrl || remoteTesting}
-                    className="w-full bg-gray-800 hover:bg-gray-700 disabled:opacity-50 border border-gray-700 hover:border-purple-500 text-gray-300 hover:text-purple-400 text-sm py-2.5 rounded-lg flex items-center justify-center gap-2 transition-all"
-                >
-                    {remoteTesting ? <div className="animate-spin w-4 h-4 border-2 border-current border-t-transparent rounded-full"/> : <Play size={16} fill="currentColor"/>}
-                    {remoteTesting ? '正在发送指令...' : '测试抓取与推送功能'}
-                </button>
+                <div className="flex gap-2">
+                     <a 
+                        href="https://dash.cloudflare.com/?to=/:account/workers/services/new" 
+                        target="_blank"
+                        rel="noreferrer"
+                        className="flex-1 bg-gray-800 hover:bg-gray-700 border border-gray-700 text-gray-300 text-xs py-2.5 rounded-lg flex items-center justify-center gap-2 transition-all"
+                     >
+                        <ExternalLink size={14} /> 去创建 Worker
+                     </a>
+                     <button 
+                        onClick={handleRemoteTest}
+                        disabled={!settings.workerUrl || remoteTesting}
+                        className="flex-[2] bg-purple-600 hover:bg-purple-500 disabled:opacity-50 disabled:bg-gray-800 text-white text-xs py-2.5 rounded-lg flex items-center justify-center gap-2 transition-all shadow-lg shadow-purple-900/20"
+                    >
+                        {remoteTesting ? <div className="animate-spin w-3 h-3 border-2 border-current border-t-transparent rounded-full"/> : <Play size={14} fill="currentColor"/>}
+                        {remoteTesting ? '指令发送中...' : '测试推送 (检查 TG)'}
+                    </button>
+                </div>
             </div>
 
             <button 
@@ -452,7 +493,7 @@ async function sendNotification(count, base64Content, recipient, log) {
                     ></textarea>
                 </div>
                 <div className="bg-gray-950 p-2 text-[10px] text-gray-600 border-t border-gray-800 text-center">
-                    请将此代码完整复制到 Cloudflare Worker 编辑器中
+                    代码已优化：推送干净的订阅链接，拒绝乱码。
                 </div>
              </div>
         </div>
