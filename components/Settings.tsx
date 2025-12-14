@@ -8,7 +8,12 @@ export const Settings: React.FC = () => {
     emailProvider: 'telegram',
     apiKey: '',
     cronSchedule: '0 8 * * *',
-    sources: [],
+    // Pre-filled with popular public GitHub repositories
+    sources: [
+        'https://raw.githubusercontent.com/freefq/free/master/v2',
+        'https://raw.githubusercontent.com/aiboboxx/v2rayfree/main/v2',
+        'https://raw.githubusercontent.com/ermaozi/get_subscribe/main/subscribe/v2ray.txt'
+    ],
     workerUrl: ''
   });
 
@@ -21,7 +26,13 @@ export const Settings: React.FC = () => {
   useEffect(() => {
     const saved = localStorage.getItem('nodescout_settings');
     if (saved) {
-      setSettings(JSON.parse(saved));
+      // Merge saved settings with defaults to ensure structure validity
+      const parsed = JSON.parse(saved);
+      // If user has no sources saved, fallback to the new defaults
+      if (!parsed.sources || parsed.sources.length === 0) {
+          parsed.sources = settings.sources;
+      }
+      setSettings(parsed);
     }
   }, []);
 

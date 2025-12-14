@@ -7,7 +7,7 @@ import { v4 as uuidv4 } from 'uuid';
 interface ScannerProps {
   onNodesFound: (nodes: NodeItem[]) => void;
   logs: ScanLog[];
-  addLog: (msg: string, type?: 'info' | 'success' | 'error') => void;
+  addLog: (msg: string, type?: 'info' | 'success' | 'error' | 'warning') => void;
 }
 
 export const Scanner: React.FC<ScannerProps> = ({ onNodesFound, logs, addLog }) => {
