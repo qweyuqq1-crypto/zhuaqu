@@ -47,10 +47,16 @@ const App: React.FC = () => {
   }, []);
 
   const handleLogin = (password: string) => {
-    // 逻辑已在 Login 组件内部验证，此处仅做状态同步
     sessionStorage.setItem('nodescout_auth', 'true');
     setIsAuthenticated(true);
+    addLog('管理员登录成功', 'success');
   };
+
+  const handleLogout = useCallback(() => {
+    sessionStorage.removeItem('nodescout_auth');
+    setIsAuthenticated(false);
+    setActiveTab(TabView.DASHBOARD);
+  }, []);
 
   const handleNodesFound = useCallback((newNodes: NodeItem[]) => {
     setNodes(prev => {
@@ -114,7 +120,7 @@ const App: React.FC = () => {
   };
 
   return (
-    <Layout activeTab={activeTab} onTabChange={setActiveTab}>
+    <Layout activeTab={activeTab} onTabChange={setActiveTab} onLogout={handleLogout}>
       {renderContent()}
     </Layout>
   );

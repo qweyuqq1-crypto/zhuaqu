@@ -1,14 +1,16 @@
+
 import React, { ReactNode } from 'react';
-import { LayoutDashboard, Globe, Settings, Radio, Activity } from 'lucide-react';
+import { LayoutDashboard, Globe, Settings, Radio, Activity, LogOut } from 'lucide-react';
 import { TabView } from '../types';
 
 interface LayoutProps {
   children: ReactNode;
   activeTab: TabView;
   onTabChange: (tab: TabView) => void;
+  onLogout: () => void;
 }
 
-export const Layout: React.FC<LayoutProps> = ({ children, activeTab, onTabChange }) => {
+export const Layout: React.FC<LayoutProps> = ({ children, activeTab, onTabChange, onLogout }) => {
   const navItems = [
     { id: TabView.DASHBOARD, label: '仪表盘', icon: LayoutDashboard },
     { id: TabView.SCANNER, label: '扫描与解析', icon: Radio },
@@ -21,7 +23,9 @@ export const Layout: React.FC<LayoutProps> = ({ children, activeTab, onTabChange
       {/* Sidebar */}
       <aside className="w-64 border-r border-gray-800 bg-gray-900 flex-shrink-0 flex flex-col hidden md:flex">
         <div className="p-6 flex items-center gap-3">
-          <Activity className="w-8 h-8 text-emerald-500" />
+          <div className="bg-emerald-500/10 p-2 rounded-xl">
+            <Activity className="w-6 h-6 text-emerald-500" />
+          </div>
           <span className="text-xl font-bold tracking-wider text-white">NodeScout<span className="text-emerald-500">.CF</span></span>
         </div>
         
@@ -30,23 +34,40 @@ export const Layout: React.FC<LayoutProps> = ({ children, activeTab, onTabChange
             <button
               key={item.id}
               onClick={() => onTabChange(item.id)}
-              className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-all duration-200 ${
+              className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 group ${
                 activeTab === item.id
                   ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 shadow-[0_0_15px_rgba(16,185,129,0.1)]'
-                  : 'text-gray-400 hover:bg-gray-800 hover:text-white'
+                  : 'text-gray-400 hover:bg-gray-800 hover:text-white border border-transparent'
               }`}
             >
-              <item.icon size={20} />
+              <item.icon size={20} className={activeTab === item.id ? 'text-emerald-400' : 'text-gray-500 group-hover:text-emerald-400 transition-colors'} />
               <span className="font-medium">{item.label}</span>
             </button>
           ))}
         </nav>
 
-        <div className="p-4 border-t border-gray-800">
-          <div className="bg-gray-800/50 p-3 rounded text-xs text-gray-500">
-            <p>状态: <span className="text-emerald-500">在线</span></p>
-            <p className="mt-1">Worker版本: <span className="text-gray-400">v2.4.1</span></p>
+        <div className="p-4 space-y-3">
+          <div className="bg-gray-800/30 p-4 rounded-2xl border border-gray-800 text-xs text-gray-500">
+            <div className="flex justify-between items-center mb-2">
+                <span>状态:</span>
+                <span className="text-emerald-500 flex items-center gap-1">
+                    <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse"></span>
+                    在线
+                </span>
+            </div>
+            <div className="flex justify-between items-center">
+                <span>权限:</span>
+                <span className="text-gray-400">管理员</span>
+            </div>
           </div>
+          
+          <button 
+            onClick={onLogout}
+            className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-xl text-gray-500 hover:text-red-400 hover:bg-red-400/5 transition-all duration-200 border border-transparent hover:border-red-400/20"
+          >
+            <LogOut size={18} />
+            <span className="font-semibold text-sm">退出登录</span>
+          </button>
         </div>
       </aside>
 
@@ -63,6 +84,7 @@ export const Layout: React.FC<LayoutProps> = ({ children, activeTab, onTabChange
                      <item.icon size={20} />
                  </button>
              ))}
+             <button onClick={onLogout} className="text-gray-500"><LogOut size={20}/></button>
           </div>
         </header>
 
