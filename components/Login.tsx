@@ -24,7 +24,7 @@ export const Login: React.FC<LoginProps> = ({ onLogin }) => {
       const envPassword = process.env.ADMIN_PASSWORD;
       
       // 如果构建时完全没有设置变量，为了防止无法进入，
-      // 我们在 UI 上显示警告，但此处逻辑允许进入（或者你可以改为强制报错）
+      // 我们在 UI 上显示警告，但此处逻辑允许进入
       if (!isEnvConfigured) {
         onLogin(password);
         setLoading(false);
@@ -35,7 +35,6 @@ export const Login: React.FC<LoginProps> = ({ onLogin }) => {
         onLogin(password);
       } else {
         setError(true);
-        // 抖动效果可以通过 CSS 类实现
         setTimeout(() => setError(false), 3000);
       }
       setLoading(false);
@@ -113,12 +112,12 @@ export const Login: React.FC<LoginProps> = ({ onLogin }) => {
           </p>
           {!isEnvConfigured && (
             <div className="bg-amber-500/5 border border-amber-500/10 p-3 rounded-xl text-left">
-              <p className="text-amber-500/80 text-[10px] leading-relaxed">
-                <b>排错指南：</b><br/>
-                1. 登录 Cloudflare 控制台 -> Pages -> 你的项目 -> 设置 -> 环境变量。<br/>
-                2. 在 <b>“构建变量”</b> (Build variables) 中添加 <code className="bg-gray-800 px-1 rounded">ADMIN_PASSWORD</code>。<br/>
-                3. <b>关键步骤</b>：前往“部署”页面，点击“重新部署”当前构建。
-              </p>
+              <div className="text-amber-500/80 text-[10px] leading-relaxed">
+                <b className="block mb-1">排错指南：</b>
+                <p>1. 登录 Cloudflare 控制台 &rarr; Pages &rarr; 项目 &rarr; 设置 &rarr; 环境变量。</p>
+                <p>2. 在 <b>构建变量</b> (Build variables) 中添加 <code className="bg-gray-800 px-1 rounded">ADMIN_PASSWORD</code>。</p>
+                <p>3. <b>关键步骤</b>：前往“部署”页面，点击“重新部署”当前构建。</p>
+              </div>
             </div>
           )}
         </div>
